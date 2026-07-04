@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Memory Lane</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+
+  :root{
+    --day-top:#7ec8f0;
+    --day-bot:#dff3ff;
+    --sun:#ffd76b;
+    --moon:#f4f1de;
+    --grass:#6fae4a;
+    --grass-dark:#5b9440;
+    --path:#d9b98a;
+    --path-dark:#c9a066;
+    --hill-back:#8fcf8a;
+    --hill-front:#5fae63;
+    --ink:#2b1e3a;
+    --cream:#fff7e8;
+    --accent:#ff8c5a;
+    --card-bg:#fffaf2;
+    --hair:#4a3524;
+    --skin:#f4c9a1;
+    --sweater:#6d4e9c;
+    --stripe:#f4ecd8;
+    --pants:#2e2a3d;
+    --shoes:#1b1826;
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0; width:100%; height:100%;
+    background:#111; overflow:hidden;
+    font-family:'VT323', monospace;
+    -webkit-user-select:none; user-select:none;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  #game{
+    position:relative;
+    width:min(94vw, calc(94vh * 210 / 297));
+    aspect-ratio: 210 / 297;
+    overflow:hidden;
+    cursor:default;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    border-radius:4px;
+    image-rendering: pixelated;
+  }
+
+  /* ---------- Parallax background layers ---------- */
+  .sky{
+    position:absolute; inset:0;
+    background: linear-gradient(var(--day-top), var(--day-bot));
+    transition: background 0.05s linear;
+  }
+  .celestial{
+    position:absolute;
+    width:56px; height:56px;
+    border-radius:50%;
+    top:8%;
+    box-shadow: 0 0 30px 10px rgba(255,215,107,0.5);
+    transition: opacity 0.3s linear, box-shadow 0.3s linear;
+  }
+  #sun{ background:var(--sun); left:12%; }
+  #moon{ background:var(--moon); left:78%; box-shadow:0 0 24px 8px rgba(244,241,222,0.4); opacity:0; }
+
+  #stars{
+    position:absolute; inset:0;
+    opacity:0;
+    background-image:
+      radial-gradient(2px 2px at 10% 20%, #fff, transparent),
+      radial-gradient(2px 2px at 25% 40%, #fff, transparent),
+      radial-gradient(1.5px 1.5px at 40% 15%, #fff, transparent),
+      radial-gradient(2px 2px at 55% 30%, #fff, transparent),
+      radial-gradient(1.5px 1.5px at 70% 10%, #fff, transparent),
+      radial-gradient(2px 2px at 85% 25%, #fff, transparent),
+      radial-gradient(1.5px 1.5px at 95% 40%, #fff, transparent),
+      radial-gradient(2px 2px at 15% 55%, #fff, transparent),
+      radial-gradient(1.5px 1.5px at 65% 50%, #fff, transparent);
+    transition: opacity 0.4s linear;
+    pointer-events:none;
+  }
+
+  .dusk-overlay{
+    position:absolute; inset:0;
+    background: linear-gradient(180deg, rgba(20,10,40,0.75), rgba(10,5,30,0.35));
+    opacity:0;
+    pointer-events:none;
+    transition: opacity 0.1s linear;
+  }
+
+  .hills{
+    position:absolute;
+    bottom:26%;
+    height:22%;
+    left:0;
+  }
+  #hillsBack{
+    background-image: radial-gradient(circle at 10% 100%, var(--hill-back) 0 60px, transparent 61px),
+                       radial-gradient(circle at 30% 100%, var(--hill-back) 0 80px, transparent 81px),
+                       radial-gradient(circle at 55% 100%, var(--hill-back) 0 70px, transparent 71px),
+                       radial-gradient(circle at 80% 100%, var(--hill-back) 0 90px, transparent 91px),
+                       radial-gradient(circle at 105% 100%, var(--hill-back) 0 65px, transparent 66px);
+    background-repeat: repeat-x;
+    background-size: 600px 100%;
+    bottom:22%;
+    opacity:0.9;
+  }
+  #hillsFront{
+    background-image: radial-gradient(circle at 15% 100%, var(--hill-front) 0 90px, transparent 91px),
+                       radial-gradient(circle at 45% 100%, var(--hill-front) 0 110px, transparent 111px),
+                       radial-gradient(circle at 75% 100%, var(--hill-front) 0 95px, transparent 96px),
+                       radial-gradient(circle at 100% 100%, var(--hill-front) 0 100px, transparent 101px);
+    background-repeat: repeat-x;
+    background-size: 500px 100%;
+    bottom:14%;
+  }
+
+  /* ---------- World (scrolls 1:1 with player) ---------- */
+  #world{
+    position:absolute;
+    left:0; bottom:0;
+    height:26%;
+    background: linear-gradient(180deg, var(--grass), var(--grass-dark) 70%);
+    border-top: 4px solid rgba(0,0,0,0.15);
+  }
+  .path{
+    position:absolute;
+    top:18px; left:0; right:0; height:34px;
+    background: linear-gradient(180deg, var(--path), var(--path-dark));
+    box-shadow: inset 0 -6px 0 rgba(0,0,0,0.08);
+  }
+
+  /* ---------- Memory posts (floating in the sky) ---------- */
+  .memory-post{
+    position:absolute;
+    bottom:200%;
+    width:164px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    transform: translateX(-50%) scale(0.92);
+    opacity:0.72;
+    transition: transform 0.25s ease, opacity 0.25s ease, filter 0.25s ease;
+    filter: saturate(0.75);
+  }
+  .memory-post.active{
+    transform: translateX(-50%) scale(1.08);
+    opacity:1;
+    filter: saturate(1.1);
+  }
+  .float-wrap{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    animation: memoryFloat 5s ease-in-out infinite;
+  }
+  .memory-post:nth-child(3n) .float-wrap{ animation-duration:6.2s; animation-delay:-1.4s; }
+  .memory-post:nth-child(3n+1) .float-wrap{ animation-duration:4.4s; animation-delay:-2.6s; }
+  @keyframes memoryFloat{
+    0%,100%{ transform: translateY(0px); }
+    50%{ transform: translateY(-14px); }
+  }
+  .cloud-puff{
+    position:relative;
+    width:210px; height:78px;
+    margin-bottom:-42px;
+  }
+  .cloud-puff::before, .cloud-puff::after{
+    content:"";
+    position:absolute;
+    background: rgba(255,255,255,0.55);
+    border-radius:50%;
+  }
+  .cloud-puff::before{
+    width:109px; height:62px;
+    left:12px; top:20px;
+  }
+  .cloud-puff::after{
+    width:90px; height:53px;
+    right:10px; top:16px;
+  }
+  .polaroid{
+    width:153px;
+    background: var(--card-bg);
+    padding:8px 8px 22px 8px;
+    border-radius:2px;
+    box-shadow: 0 6px 14px rgba(0,0,0,0.35), 0 0 0 2px rgba(0,0,0,0.06);
+    text-align:center;
+    z-index:1;
+  }
+  .memory-post.active .polaroid{
+    box-shadow: 0 0 0 3px var(--accent), 0 8px 18px rgba(0,0,0,0.4);
+  }
+  .photo-thumb{
+    width:100%; height:127px;
+    border-radius:1px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:48px;
+    image-rendering:pixelated;
+  }
+  .mem-label{
+    font-family:'Press Start 2P', monospace;
+    font-size:11px;
+    color:#6b5a3f;
+    margin-top:10px;
+    letter-spacing:0.5px;
+  }
+  .caption-box{
+    position:absolute;
+    bottom:100%;
+    margin-bottom:10px;
+    width:252px;
+    background: var(--card-bg);
+    border:2px solid var(--ink);
+    border-radius:6px;
+    padding:8px 10px;
+    font-size:17px;
+    line-height:1.15;
+    color:var(--ink);
+    text-align:center;
+    opacity:0;
+    transform: translateY(6px);
+    pointer-events:none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    box-shadow:0 4px 10px rgba(0,0,0,0.3);
+  }
+  .memory-post.active .caption-box{
+    opacity:1;
+    transform: translateY(0);
+  }
+  .caption-box:after{
+    content:"";
+    position:absolute;
+    top:100%; left:50%;
+    transform: translateX(-50%);
+    border:6px solid transparent;
+    border-top-color: var(--ink);
+  }
+
+  /* ---------- Trees (animated, swaying with blowing leaves) ---------- */
+  #treesLayer{
+    position:absolute; inset:0;
+    pointer-events:none;
+  }
+  .tree{
+    position:absolute;
+    bottom:8px;
+    width:70px; height:150px;
+    transform-origin:bottom center;
+  }
+  .tree-trunk{
+    position:absolute;
+    bottom:0; left:50%;
+    width:12px; height:46px;
+    margin-left:-6px;
+    background: linear-gradient(180deg,#8a6a45,#6e5236);
+    border-radius:1px;
+  }
+  .tree-canopy{
+    position:absolute;
+    left:50%;
+    border-radius:50%;
+    background: var(--tree-color, #5b9440);
+    transform: translateX(-50%);
+  }
+  .tree .canopy-a{ width:64px; height:58px; bottom:38px; }
+  .tree .canopy-b{ width:48px; height:46px; bottom:70px; background: var(--tree-color-2, #6fae4a); }
+  .tree .canopy-c{ width:38px; height:36px; bottom:94px; background: var(--tree-color-3, #82c458); }
+  .tree-canopy-group{
+    position:absolute; inset:0;
+    animation: treeSway 3.6s ease-in-out infinite;
+    transform-origin: bottom center;
+  }
+  @keyframes treeSway{
+    0%,100%{ transform: rotate(-3deg); }
+    50%{ transform: rotate(3deg); }
+  }
+  .leaf{
+    position:absolute;
+    width:7px; height:7px;
+    background: #9fcf5e;
+    border-radius:2px 6px;
+    opacity:0.9;
+    pointer-events:none;
+    animation: leafBlow 4s linear infinite;
+  }
+  @keyframes leafBlow{
+    0%{ transform: translate(0,0) rotate(0deg); opacity:0.9; }
+    70%{ opacity:0.8; }
+    100%{ transform: translate(90px,50px) rotate(320deg); opacity:0; }
+  }
+
+  /* ---------- Character (chibi pixel-art style, 30% larger, standing on the path) ---------- */
+  #player{
+    position:absolute;
+    top:-10px;
+    width:42px; height:62px;
+    transform-origin:bottom center;
+    image-rendering: pixelated;
+  }
+  #player.facing-left{ transform: scaleX(-1); }
+
+  #player .hair-top{
+    position:absolute; left:8px; top:0px; width:26px; height:12px;
+    background:var(--hair);
+    border-radius:1px;
+  }
+  #player .hair-side{
+    position:absolute; top:9px; width:7px; height:14px;
+    background:var(--hair);
+    border-radius:0 0 1px 1px;
+  }
+  #player .hair-side.left{ left:7px; }
+  #player .hair-side.right{ left:29px; }
+
+  #player .head{
+    position:absolute; left:9px; top:5px; width:23px; height:20px;
+    background:var(--skin);
+    border-radius:1px;
+  }
+  #player .eye{
+    position:absolute; top:13px; width:4px; height:4px;
+    background:#221a2e;
+  }
+  #player .eye.left{ left:14px; }
+  #player .eye.right{ left:25px; }
+  #player .blush{
+    position:absolute; top:18px; width:4px; height:3px;
+    background:#ff9d9d;
+    border-radius:1px;
+    opacity:0.85;
+  }
+  #player .blush.left{ left:12px; }
+  #player .blush.right{ left:26px; }
+
+  #player .body{
+    position:absolute; left:10px; top:25px; width:21px; height:21px;
+    background:var(--sweater);
+    border-radius:1px;
+  }
+  #player .stripe{
+    position:absolute; left:10px; top:33px; width:21px; height:5px;
+    background:var(--stripe);
+  }
+  #player .arm{
+    position:absolute; top:26px; width:5px; height:14px;
+    background:var(--sweater);
+    border-radius:1px;
+  }
+  #player .arm.left{ left:7px; }
+  #player .arm.right{ left:30px; }
+
+  #player .leg{
+    position:absolute; bottom:7px; width:8px; height:14px;
+    background:var(--pants);
+    border-radius:1px;
+    transform-origin: top center;
+  }
+  #player .leg.left{ left:12px; }
+  #player .leg.right{ left:22px; }
+  #player .shoe{
+    position:absolute; bottom:0; width:9px; height:7px;
+    background:var(--shoes);
+    border-radius:1px;
+  }
+  #player .shoe.left{ left:10px; }
+  #player .shoe.right{ left:22px; }
+  #player.walking .leg.left{ animation: legswing 0.32s infinite ease-in-out; }
+  #player.walking .leg.right{ animation: legswing 0.32s infinite ease-in-out reverse; }
+  @keyframes legswing{
+    0%,100%{ transform: rotate(18deg); }
+    50%{ transform: rotate(-18deg); }
+  }
+  #player:not(.walking){
+    animation: idlebob 1.6s infinite ease-in-out;
+  }
+  @keyframes idlebob{
+    0%,100%{ transform: translateY(0); }
+    50%{ transform: translateY(-2px); }
+  }
+  #player.facing-left:not(.walking){ animation:none; }
+
+  /* fireflies at night */
+  .firefly{
+    position:absolute;
+    width:4px; height:4px;
+    border-radius:50%;
+    background:#e8ff8a;
+    box-shadow:0 0 6px 2px rgba(232,255,138,0.8);
+    opacity:0;
+    animation: float 4s infinite ease-in-out;
+  }
+  @keyframes float{
+    0%,100%{ transform: translateY(0) translateX(0); }
+    50%{ transform: translateY(-14px) translateX(6px); }
+  }
+
+  /* ---------- UI ---------- */
+  #hud{
+    position:absolute; top:0; left:0; right:0;
+    padding:14px 16px;
+    display:flex; justify-content:space-between; align-items:flex-start;
+    z-index:20;
+    pointer-events:none;
+  }
+  #title{
+    font-family:'Press Start 2P', monospace;
+    font-size:13px;
+    color:var(--cream);
+    text-shadow: 2px 2px 0 rgba(0,0,0,0.4);
+  }
+  #counter{
+    font-size:20px;
+    color:var(--cream);
+    background: rgba(0,0,0,0.35);
+    border-radius:8px;
+    padding:4px 12px;
+    pointer-events:auto;
+  }
+  #progressWrap{
+    position:absolute; top:44px; left:16px; right:16px;
+    height:6px; background:rgba(0,0,0,0.3); border-radius:4px;
+    overflow:hidden;
+    z-index:20;
+  }
+  #progressBar{
+    height:100%; width:0%;
+    background: var(--accent);
+    transition: width 0.2s ease;
+  }
+  #resetBtn{
+    position:absolute; top:14px; right:16px;
+    font-family:'VT323', monospace;
+    font-size:16px;
+    background: rgba(0,0,0,0.35);
+    color:var(--cream);
+    border:1px solid rgba(255,255,255,0.4);
+    border-radius:6px;
+    padding:4px 10px;
+    cursor:pointer;
+    pointer-events:auto;
+    z-index:25;
+  }
+
+  /* Touch controls */
+  #touchControls{
+    position:absolute; bottom:18px; left:0; right:0;
+    display:none;
+    justify-content:space-between;
+    padding:0 20px;
+    z-index:30;
+  }
+  .touch-btn{
+    width:64px; height:64px;
+    border-radius:50%;
+    background: rgba(255,255,255,0.25);
+    border:2px solid rgba(255,255,255,0.6);
+    color:#fff;
+    font-size:26px;
+    display:flex; align-items:center; justify-content:center;
+    -webkit-tap-highlight-color: transparent;
+  }
+  @media (max-width:820px), (pointer:coarse){
+    #touchControls{ display:flex; }
+  }
+
+  /* Overlays */
+  .overlay-screen{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background: rgba(10,5,25,0.72);
+    z-index:50;
+    text-align:center;
+    padding:20px;
+  }
+  .overlay-card{
+    background: var(--card-bg);
+    border-radius:10px;
+    padding:28px 24px;
+    max-width:min(340px, 88%);
+    box-shadow:0 10px 30px rgba(0,0,0,0.5);
+  }
+  .overlay-card h1{
+    font-family:'Press Start 2P', monospace;
+    font-size:20px;
+    color:var(--ink);
+    margin:0 0 16px 0;
+    line-height:1.5;
+  }
+  .overlay-card p{
+    font-size:19px;
+    color:#5a4c3f;
+    margin:0 0 20px 0;
+    line-height:1.35;
+  }
+  .name-row{
+    display:flex; gap:8px; align-items:center; justify-content:center;
+    margin-bottom:12px;
+  }
+  .name-input{
+    font-family:'VT323', monospace;
+    font-size:16px;
+    padding:8px 10px;
+    border-radius:6px;
+    border:1px solid rgba(0,0,0,0.12);
+    width:180px;
+  }
+  .overlay-btn.small{ padding:8px 12px; font-size:12px; box-shadow:none; }
+  .overlay-btn{
+    font-family:'Press Start 2P', monospace;
+    font-size:12px;
+    background: var(--accent);
+    color:#fff;
+    border:none;
+    border-radius:6px;
+    padding:14px 20px;
+    cursor:pointer;
+    box-shadow:0 4px 0 #c9673a;
+  }
+  .overlay-btn:active{
+    transform: translateY(3px);
+    box-shadow:none;
+  }
+  .hidden{ display:none !important; }
+</style>
+</head>
+<body>
+
+<div id="game">
+  <div class="sky"></div>
+  <div id="sun" class="celestial"></div>
+  <div id="moon" class="celestial"></div>
+  <div id="stars"></div>
+  <div id="fireflyLayer"></div>
+  <div class="hills" id="hillsBack"></div>
+  <div class="hills" id="hillsFront"></div>
+  <div class="dusk-overlay" id="duskOverlay"></div>
+
+  <div id="world">
+    <div class="path"></div>
+    <div id="treesLayer"></div>
+    <div id="postsLayer"></div>
+    <div id="player" class="idle">
+      <div class="leg left"></div>
+      <div class="leg right"></div>
+      <div class="shoe left"></div>
+      <div class="shoe right"></div>
+      <div class="arm left"></div>
+      <div class="arm right"></div>
+      <div class="body"></div>
+      <div class="stripe"></div>
+      <div class="head"></div>
+      <div class="hair-side left"></div>
+      <div class="hair-side right"></div>
+      <div class="hair-top"></div>
+      <div class="eye left"></div>
+      <div class="eye right"></div>
+      <div class="blush left"></div>
+      <div class="blush right"></div>
+    </div>
+  </div>
+
+  <div id="hud">
+    <div id="title">MEMORY LANE</div>
+    <div id="counter">Memories: 0 / 0</div>
+  </div>
+  <div id="progressWrap"><div id="progressBar"></div></div>
+  <button id="resetBtn">⟲ Restart</button>
+
+  <div id="touchControls">
+    <div class="touch-btn" id="btnLeft">◀</div>
+    <div class="touch-btn" id="btnRight">▶</div>
+  </div>
+
+  <div class="overlay-screen" id="startScreen">
+    <div class="overlay-card">
+      <h1>MEMORY<br/>LANE</h1>
+      <p>Walk right to wander through the memories, one photo at a time.<br/><br/> 
+      ← → or A / D to walk. On phone, use the arrow buttons.<br/><br/>Enter your name to begin:</p>
+      <div class="name-row">
+        <input id="nameInput" class="name-input" placeholder="Your name" aria-label="Your name" />
+        <button id="saveNameBtn" class="overlay-btn small">Save</button>
+      </div>
+      <button class="overlay-btn" id="startBtn">Start Walking</button>
+    </div>
+  </div>
+
+  <div class="overlay-screen hidden" id="endScreen">
+    <div class="overlay-card">
+      <h1>THE END<br/>(FOR NOW)</h1>
+      <p>Thanks for walking down memory lane. ❤️<br/><br/>Thank you for being my friend, <span id="endName">Friend</span>.</p>
+      <button class="overlay-btn" id="restartBtn">Walk Again</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   EDIT ME: This is where the actual memories live.
+   - caption: the text shown above each photo (swap in your real captions)
+   - gradient: a CSS gradient used as a placeholder "photo" background
+   - emoji: a little icon shown on the placeholder photo
+   - image: (optional) set this to a real image URL or a base64 data URI
+            (e.g. "data:image/jpeg;base64,...") and it will be used instead
+            of the gradient placeholder automatically.
+   Add or remove objects from this array to add/remove stops along the path.
+   ========================================================================= */
+const PHOTOS = [
+  { label: "MEMORY 1", caption: "We are so cute!", gradient: "linear-gradient(135deg,#ffb997,#f67e7d)", emoji: "📷", image: "images/IMG_2689.JPG" },
+  { label: "MEMORY 2", caption: "I have the best time with you!", gradient: "linear-gradient(135deg,#a1de93,#60a561)", emoji: "📷", image: "images/IMG_1726.jpg" },
+  { label: "MEMORY 3", caption: "So accomplished!", gradient: "linear-gradient(135deg,#93c7de,#4f7ea3)", emoji: "📷", image: "images/IMG_2307.jpg" },
+  { label: "MEMORY 4", caption: "If your friends jump off a cliff?...", gradient: "linear-gradient(135deg,#e0c15c,#c98a3f)", emoji: "📷", image: "images/IMG_3990.JPG" },
+  { label: "MEMORY 5", caption: "I would jump off too.", gradient: "linear-gradient(135deg,#c9a1de,#8f5fa8)", emoji: "📷", image: "images/IMG_4482.jpg" },
+  { label: "MEMORY 6", caption: "I LOVE YOU!", gradient: "linear-gradient(135deg,#f5a3c7,#c14f7e)", emoji: "📷", image: "images/IMG_0775.JPG" },
+];
+
+const SPACING = 560;
+const START_X = 260;
+// Extended end margin so scenery continues past the last memory
+const END_MARGIN = 1200;
+// Increased reveal distance to account for larger thumbnails
+const REVEAL_DIST = 180;
+const SPEED = 4.4;
+
+const worldWidth = START_X + (PHOTOS.length - 1) * SPACING + END_MARGIN;
+
+const game = document.getElementById('game');
+const world = document.getElementById('world');
+const postsLayer = document.getElementById('postsLayer');
+const player = document.getElementById('player');
+const sunEl = document.getElementById('sun');
+const moonEl = document.getElementById('moon');
+const starsEl = document.getElementById('stars');
+const duskOverlay = document.getElementById('duskOverlay');
+const hillsBack = document.getElementById('hillsBack');
+const hillsFront = document.getElementById('hillsFront');
+const counterEl = document.getElementById('counter');
+const progressBar = document.getElementById('progressBar');
+const fireflyLayer = document.getElementById('fireflyLayer');
+const startScreen = document.getElementById('startScreen');
+const endScreen = document.getElementById('endScreen');
+
+counterEl.textContent = `Memories: 0 / ${PHOTOS.length}`;
+
+world.style.width = worldWidth + 'px';
+
+// Build memory posts
+const postEls = PHOTOS.map((p, i) => {
+  const x = START_X + i * SPACING;
+  const post = document.createElement('div');
+  post.className = 'memory-post';
+  post.style.left = x + 'px';
+
+  const caption = document.createElement('div');
+  caption.className = 'caption-box';
+  caption.textContent = p.caption;
+
+  const floatWrap = document.createElement('div');
+  floatWrap.className = 'float-wrap';
+
+  const cloud = document.createElement('div');
+  cloud.className = 'cloud-puff';
+
+  const polaroid = document.createElement('div');
+  polaroid.className = 'polaroid';
+
+  const thumb = document.createElement('div');
+  thumb.className = 'photo-thumb';
+  if (p.image) {
+    thumb.style.backgroundImage = `url(${p.image})`;
+    thumb.style.backgroundSize = 'cover';
+    thumb.style.backgroundPosition = 'center';
+  } else {
+    thumb.style.background = p.gradient;
+    thumb.textContent = p.emoji;
+  }
+
+  const label = document.createElement('div');
+  label.className = 'mem-label';
+  label.textContent = p.label;
+
+  polaroid.appendChild(thumb);
+  polaroid.appendChild(label);
+  floatWrap.appendChild(caption);
+  floatWrap.appendChild(cloud);
+  floatWrap.appendChild(polaroid);
+  post.appendChild(floatWrap);
+  postsLayer.appendChild(post);
+  return { el: post, x, visited: false };
+});
+
+// Trees along the path, swaying with blowing leaves
+const treesLayer = document.getElementById('treesLayer');
+const treePalettes = [
+  ['#4f8a3a', '#5fae63', '#78c458'],
+  ['#417a4a', '#5b9a5f', '#71b96e'],
+  ['#54873f', '#66a850', '#82c458'],
+];
+const TREE_SPACING = 210;
+const numTrees = Math.ceil(worldWidth / TREE_SPACING);
+for (let i = 0; i < numTrees; i++) {
+  const x = 60 + i * TREE_SPACING + (i % 2 === 0 ? 0 : 40);
+  const palette = treePalettes[i % treePalettes.length];
+  const scale = 0.8 + ((i * 37) % 40) / 100; // pseudo-random 0.8–1.2
+
+  const tree = document.createElement('div');
+  tree.className = 'tree';
+  tree.style.left = x + 'px';
+  tree.style.transform = `scale(${scale.toFixed(2)})`;
+
+  const trunk = document.createElement('div');
+  trunk.className = 'tree-trunk';
+
+  const canopyGroup = document.createElement('div');
+  canopyGroup.className = 'tree-canopy-group';
+  canopyGroup.style.animationDuration = (3 + (i % 5) * 0.4) + 's';
+  canopyGroup.style.animationDelay = -(i * 0.6) + 's';
+
+  const canopyA = document.createElement('div');
+  canopyA.className = 'tree-canopy canopy-a';
+  canopyA.style.background = palette[0];
+  const canopyB = document.createElement('div');
+  canopyB.className = 'tree-canopy canopy-b';
+  canopyB.style.background = palette[1];
+  const canopyC = document.createElement('div');
+  canopyC.className = 'tree-canopy canopy-c';
+  canopyC.style.background = palette[2];
+
+  canopyGroup.appendChild(canopyA);
+  canopyGroup.appendChild(canopyB);
+  canopyGroup.appendChild(canopyC);
+  tree.appendChild(trunk);
+  tree.appendChild(canopyGroup);
+  treesLayer.appendChild(tree);
+
+  // Leaves blowing off this tree
+  const leafColors = ['#9fcf5e', '#c9de6b', '#e8cf6b'];
+  for (let l = 0; l < 3; l++) {
+    const leaf = document.createElement('div');
+    leaf.className = 'leaf';
+    leaf.style.background = leafColors[l % leafColors.length];
+    leaf.style.left = (x - 10 + l * 8) + 'px';
+    leaf.style.bottom = (95 + l * 12) + 'px';
+    leaf.style.animation = `leafBlow ${4 + (l + i) % 3}s linear infinite`;
+    leaf.style.animationDelay = -((i * 1.3 + l) % 5) + 's';
+    treesLayer.appendChild(leaf);
+  }
+}
+
+// Fireflies
+for (let i = 0; i < 10; i++) {
+  const f = document.createElement('div');
+  f.className = 'firefly';
+  f.style.left = (5 + Math.random() * 90) + '%';
+  f.style.top = (40 + Math.random() * 40) + '%';
+  f.style.animationDelay = (Math.random() * 4) + 's';
+  fireflyLayer.appendChild(f);
+}
+
+let playerX = 0;
+let visitedCount = 0;
+let facing = 'right';
+let moveLeft = false, moveRight = false;
+let started = false;
+let ended = false;
+
+function lerp(a, b, t){ return a + (b - a) * t; }
+
+function updateSky(progress){
+  // progress: 0 (still day, hasn't reached memory 3 yet) -> 1 (full night, end of walk)
+  const dusk = progress;
+  duskOverlay.style.opacity = (dusk * 0.85).toFixed(2);
+
+  const sunOpacity = Math.max(0, 1 - progress / 0.7);
+  sunEl.style.opacity = sunOpacity.toFixed(2);
+
+  const moonOpacity = Math.min(1, progress / 0.3);
+  moonEl.style.opacity = moonOpacity.toFixed(2);
+
+  const starOpacity = Math.min(1, progress / 0.6);
+  starsEl.style.opacity = starOpacity.toFixed(2);
+
+  const fireflyOpacity = starOpacity;
+  fireflyLayer.style.opacity = fireflyOpacity.toFixed(2);
+
+  // sun drifts gently; moon descends into view from the top right as night falls
+  sunEl.style.left = (12 + progress * 15) + '%';
+  moonEl.style.left = (74 + progress * 6) + '%';
+  moonEl.style.top = (-22 + progress * 30) + '%';
+}
+
+function getViewportWidth(){
+  return game.clientWidth;
+}
+
+function render(){
+  const viewportWidth = getViewportWidth();
+  const maxCam = Math.max(0, worldWidth - viewportWidth);
+  const camX = Math.min(maxCam, Math.max(0, playerX - viewportWidth / 2));
+
+  world.style.transform = `translateX(${-camX}px)`;
+  hillsBack.style.transform = `translateX(${-camX * 0.25}px)`;
+  hillsFront.style.transform = `translateX(${-camX * 0.45}px)`;
+
+  // player is a child of #world, which is already shifted by -camX above,
+  // so its left position should be its raw world coordinate (no second offset)
+  player.style.left = playerX + 'px';
+
+  // Night transition starts at memory 3's position and ramps to full night
+  // by the end of the walk.
+  const nightStartX = postEls[Math.min(2, postEls.length - 1)].x;
+  const nightEndX = Math.max(nightStartX + 1, worldWidth - viewportWidth * 0.4);
+  const nightProgress = (playerX - nightStartX) / (nightEndX - nightStartX);
+  updateSky(Math.min(1, Math.max(0, nightProgress)));
+
+  // reveal logic
+  postEls.forEach(p => {
+    const dist = Math.abs(playerX - p.x);
+    const active = dist < REVEAL_DIST;
+    p.el.classList.toggle('active', active);
+    if (active && !p.visited) {
+      p.visited = true;
+      visitedCount++;
+      counterEl.textContent = `Memories: ${visitedCount} / ${PHOTOS.length}`;
+      progressBar.style.width = (visitedCount / PHOTOS.length * 100) + '%';
+    }
+  });
+
+  // end condition
+  if (!ended && playerX >= worldWidth - viewportWidth - 40 && started) {
+    ended = true;
+    setTimeout(() => {
+      // insert the player's name safely into the end screen
+      const endNameEl = document.getElementById('endName');
+      if (endNameEl) endNameEl.textContent = playerName || 'Friend';
+      endScreen.classList.remove('hidden');
+    }, 500);
+  }
+}
+
+function loop(){
+  if (started && !ended) {
+    const viewportWidth = getViewportWidth();
+    const maxX = worldWidth - viewportWidth * 0.4;
+    let dx = 0;
+    if (moveLeft) dx -= SPEED;
+    if (moveRight) dx += SPEED;
+
+    if (dx !== 0) {
+      playerX = Math.min(Math.max(0, playerX + dx), maxX);
+      player.classList.add('walking');
+      const newFacing = dx > 0 ? 'right' : 'left';
+      if (newFacing !== facing) {
+        facing = newFacing;
+        player.classList.toggle('facing-left', facing === 'left');
+      }
+    } else {
+      player.classList.remove('walking');
+    }
+  }
+  render();
+  requestAnimationFrame(loop);
+}
+
+function setMove(dir, active){
+  if (dir === 'left') moveLeft = active;
+  if (dir === 'right') moveRight = active;
+}
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowLeft','a','A'].includes(e.key)) setMove('left', true);
+  if (['ArrowRight','d','D'].includes(e.key)) setMove('right', true);
+});
+window.addEventListener('keyup', (e) => {
+  if (['ArrowLeft','a','A'].includes(e.key)) setMove('left', false);
+  if (['ArrowRight','d','D'].includes(e.key)) setMove('right', false);
+});
+
+const btnLeft = document.getElementById('btnLeft');
+const btnRight = document.getElementById('btnRight');
+[['pointerdown', true], ['pointerup', false], ['pointerleave', false]].forEach(([evt, val]) => {
+  btnLeft.addEventListener(evt, (e) => { e.preventDefault(); setMove('left', val); });
+  btnRight.addEventListener(evt, (e) => { e.preventDefault(); setMove('right', val); });
+});
+
+document.getElementById('startBtn').addEventListener('click', () => {
+  // save name (if entered) and start
+  if (typeof saveName === 'function') saveName();
+  started = true;
+  startScreen.classList.add('hidden');
+});
+
+// --- Player name handling ---
+let playerName = localStorage.getItem('memoryLanePlayerName') || '';
+const nameInput = document.getElementById('nameInput');
+const saveNameBtn = document.getElementById('saveNameBtn');
+if (nameInput) {
+  nameInput.value = playerName;
+  nameInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') saveName(); });
+}
+function saveName(){
+  if (!nameInput) return;
+  const v = (nameInput.value || '').trim();
+  playerName = v;
+  if (v) localStorage.setItem('memoryLanePlayerName', v);
+  else localStorage.removeItem('memoryLanePlayerName');
+}
+if (saveNameBtn) saveNameBtn.addEventListener('click', saveName);
+
+function resetGame(){
+  playerX = 0;
+  visitedCount = 0;
+  ended = false;
+  facing = 'right';
+  player.classList.remove('facing-left');
+  postEls.forEach(p => { p.visited = false; p.el.classList.remove('active'); });
+  counterEl.textContent = `Memories: 0 / ${PHOTOS.length}`;
+  progressBar.style.width = '0%';
+  endScreen.classList.add('hidden');
+}
+
+document.getElementById('resetBtn').addEventListener('click', resetGame);
+document.getElementById('restartBtn').addEventListener('click', () => {
+  resetGame();
+});
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
